@@ -1,0 +1,28 @@
+sever:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/chapter_db
+    username: chapter.user
+    password: chapter-backend
+    class: com.mysql.jdbc.Driver
+  jpa:
+    properties:
+      hibernate:
+        show_sql: ${SHOW_SQL:true}
+        type: all
+        dialect: org.hibernate.dialect.MySQL5Dialect
+    hibernate:
+      ddl-auto: create
+
+aws:
+  region:
+    static: sa-east-1
+    auto: false
+  sqs:
+    queueUrl: http://localhost:4566/000000000000/chapter
+    maxReceiveCount: 2
+    delaySeconds: 15
+    accessKey: teste-chapter
+    secretAccessKey: teste-chapter

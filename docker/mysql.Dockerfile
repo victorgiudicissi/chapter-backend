@@ -1,4 +1,8 @@
 FROM mysql:latest
 
-RUN make /app
-CMD python /app/app.py
+EXPOSE 3306
+
+ENV MYSQL_PASSWORD='chapter-backend'
+ENV MYSQL_USER=chapter.user
+ENV MYSQL_DATABASE=chapter_db
+ENV MYSQL_ROOT_PASSWORD=root
