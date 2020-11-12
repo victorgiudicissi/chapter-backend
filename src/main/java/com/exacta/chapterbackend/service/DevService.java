@@ -1,29 +1,15 @@
 package com.exacta.chapterbackend.service;
 
 import com.exacta.chapterbackend.model.Dev;
-import com.exacta.chapterbackend.repository.DevRepository;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
-@Service
-public class DevService {
-    private DevRepository devRepository;
+public interface DevService {
 
-    public DevService(DevRepository devRepository) {
-        this.devRepository = devRepository;
-    }
+    public Optional<Dev> findById(Long id);
+    public List<Dev> findAll();
+    public Dev save(Dev dev);
 
-    public List<Dev> findAll() {
-        return devRepository.findAll();
-    }
-
-    public Optional<Dev> findById(Long id) {
-        return devRepository.findById(id);
-    }
-
-    public Dev save(Dev dev) {
-        return devRepository.save(dev);
-    }
+    public Dev update(Long id);
 }

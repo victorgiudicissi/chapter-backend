@@ -1,94 +1,92 @@
 package com.exacta.chapterbackend.config;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
+import com.amazonaws.services.sqs.model.*;
+import com.amazonaws.util.StringUtils;
+import com.amazonaws.util.json.Jackson;
+import com.exacta.chapterbackend.model.Dev;
+import com.exacta.chapterbackend.service.DevService;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class SQSManager {
 
+    private final static String SQS_INCENTIVE_ATTRIBUTE = "SQS-DEV-ATTRIBUTE";
+
     private final ApplicationConfig applicationConfig;
     private final AmazonSQS sqs;
+    private final DevService devService;
+    private final String queueUrl;
 
-    public SQSManager(ApplicationConfig applicationConfig) {
+    public SQSManager(ApplicationConfig applicationConfig, @Lazy DevService devService) {
         this.applicationConfig = applicationConfig;
+        this.devService = devService;
+        this.queueUrl = applicationConfig.getQueueUrl();
+
         sqs = AmazonSQSClientBuilder
                 .standard()
-                .withCredentials(new AWSStaticCredentialsProvider(generatorBasicAWSCredentials(config.getAccessKey(), config.getSecretKey())))
-                .withRegion(config.getRegion()).build();
-
-        this.queueUrl = config.getQueueUrl();
-        this.deadLetterQueueUrl = config.getQueueDLQUrl();
-
-        // Get dead-letter queue ARN
-        GetQueueAttributesResult deadLetterQueueAttributes = sqs.getQueueAttributes(new GetQueueAttributesRequest(deadLetterQueueUrl).withAttributeNames("QueueArn"));
-
-        String deadLetterQueueARN = deadLetterQueueAttributes.getAttributes()
-                .get("QueueArn");
-
-        //Set DLQ QueueArn
-        SetQueueAttributesRequest queueAttributesRequest = new SetQueueAttributesRequest().withQueueUrl(queueUrl)
-                .addAttributesEntry("RedrivePolicy", "{\"maxReceiveCount\":\"" + config.getMaxReceiveCount() + "\", " + "\"deadLetterTargetArn\":\"" + deadLetterQueueARN + "\"}");
-
-        sqs.setQueueAttributes(queueAttributesRequest);
-
-        execute.put(SQSOperationEnum.SHOP, b2WSqsExecute);
-        execute.put(SQSOperationEnum.SUBA, b2WSqsExecute);
-        execute.put(SQSOperationEnum.SOUB, b2WSqsExecute);
-        execute.put(SQSOperationEnum.ACOM, b2WSqsExecute);
+                .withCredentials(new AWSStaticCredentialsProvider(
+                        generatorBasicAWSCredentials(applicationConfig.getAccessKey(), applicationConfig.getSecretKey()))
+                )
+                .withRegion(applicationConfig.getRegion())
+                .build();
     }
 
-    public void enqueue(String messageBody, Map<String, MessageAttributeValue> messageAttributes) {
+    public void enqueue(Long devId) {
 
-        SendMessageRequest sendMessageStandardQueue = new SendMessageRequest().withQueueUrl(config.getQueueUrl())
+        String messageBody = "{ \"id\": \""+ devId +"\"}";
+
+        SendMessageRequest sendMessageStandardQueue = new SendMessageRequest()
+                .withQueueUrl(applicationConfig.getQueueUrl())
                 .withMessageBody(messageBody)
-                .withMessageAttributes(messageAttributes);
+                .withMessageAttributes(messageAttributes());
 
-
-        final SendMessageResult sendMessageResult = sqs.sendMessage(sendMessageStandardQueue);
-
-        if (sendMessageResult == null) {
-            throw new BPayException(500, "api_gift", "Erro ao enviar a mensagem para a fila, " + queueUrl);
-        }
-
+       sqs.sendMessage(sendMessageStandardQueue);
     }
 
-    @Scheduled(fixedRate = 1000)
-    public Disposable getMessage() {
+    private Map<String, MessageAttributeValue> messageAttributes() {
+        Map<String, MessageAttributeValue> messageAttribute = new HashMap<>();
 
+        messageAttribute.put(
+                SQS_INCENTIVE_ATTRIBUTE,
+                new MessageAttributeValue().withDataType("String").withStringValue("DEV-TO-CONSUME")
+        );
+
+        return messageAttribute;
+    }
+
+    @Scheduled(fixedRate = 15000)
+    public void processMessage() {
         final ReceiveMessageRequest receiveMessageRequest =
-                new ReceiveMessageRequest(queueUrl)
-                        .withMaxNumberOfMessages(10)
-                        .withWaitTimeSeconds(1);
+                new ReceiveMessageRequest(queueUrl).withMaxNumberOfMessages(10).withWaitTimeSeconds(1);
 
-        final List<Message> messages = sqs.receiveMessage(receiveMessageRequest.withMessageAttributeNames(Constants.SQS_EXECUTER_GIFT))
-                .getMessages();
+        final List<Message> messages = sqs.receiveMessage(
+                receiveMessageRequest.withMessageAttributeNames(SQS_INCENTIVE_ATTRIBUTE)
+        ).getMessages();
 
-        for (final Message message : messages) {
-            String body = message.getBody();
+        messages.stream().forEach(message -> {
 
-            if (!"".equals(body)) {
-                Gift gift = JsonUtil.fromJson(message.getBody(), Gift.class);
+            if (!StringUtils.isNullOrEmpty(message.getBody())) {
+                Dev dev = Jackson.fromJsonString(message.getBody(), Dev.class);
 
-                MessageAttributeValue attributeValueExecutor = message.getMessageAttributes().get(Constants.SQS_EXECUTER_GIFT);
+                if (dev != null && dev.getId() != null) {
+                    dev = devService.update(dev.getId());
 
-                if (attributeValueExecutor != null && attributeValueExecutor.getStringValue() != null && gift != null) {
-
-                    final SQSOperationEnum sqsOperationEnum = SQSOperationEnum.valueOf(attributeValueExecutor.getStringValue());
-
-                    return execute.get(sqsOperationEnum).execute(gift).flatMap(giftResponse -> {
-
-                        if (Boolean.TRUE.equals(giftResponse.isExecuted())) {
-                            final String messageReceiptHandle = message.getReceiptHandle();
-                            sqs.deleteMessage(new DeleteMessageRequest(queueUrl, messageReceiptHandle));
-                        }
-                        return Mono.empty();
-                    }).subscribe();
+                    if(dev.isHired()) {
+                        sqs.deleteMessage(new DeleteMessageRequest(queueUrl, message.getReceiptHandle()));
+                    }
                 }
             }
-        }
-        return null;
+        });
     }
 
     private BasicAWSCredentials generatorBasicAWSCredentials(String accessKey, String secretKeyId) {

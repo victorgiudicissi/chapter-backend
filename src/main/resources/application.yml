@@ -14,7 +14,7 @@ spring:
         type: all
         dialect: org.hibernate.dialect.MySQL5Dialect
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
 
 aws:
   region:
