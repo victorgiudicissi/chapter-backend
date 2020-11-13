@@ -21,9 +21,6 @@ public class ApplicationConfig {
     @Value(value = "${aws.sqs.delaySeconds}")
     private int delaySeconds;
 
-    @Value(value = "${aws.sqs.maxReceiveCount}")
-    private int maxReceiveCount;
-
     public String getRegion() {
         return region;
     }
@@ -42,10 +39,6 @@ public class ApplicationConfig {
 
     public int getDelaySeconds() {
         return delaySeconds;
-    }
-
-    public int getMaxReceiveCount() {
-        return maxReceiveCount;
     }
 
 }

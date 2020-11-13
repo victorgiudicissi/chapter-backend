@@ -8,11 +8,6 @@ spring:
     password: chapter-backend
     class: com.mysql.jdbc.Driver
   jpa:
-    properties:
-      hibernate:
-        show_sql: ${SHOW_SQL:true}
-        type: all
-        dialect: org.hibernate.dialect.MySQL5Dialect
     hibernate:
       ddl-auto: update
 
@@ -22,7 +17,6 @@ aws:
     auto: false
   sqs:
     queueUrl: http://localhost:4566/000000000000/chapter
-    maxReceiveCount: 2
     delaySeconds: 15
     accessKey: teste-chapter
     secretAccessKey: teste-chapter

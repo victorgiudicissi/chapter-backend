@@ -6,10 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface DevService {
-
-    public Optional<Dev> findById(Long id);
-    public List<Dev> findAll();
-    public Dev save(Dev dev);
-
-    public Dev update(Long id);
+     Optional<Dev> findById(Long id);
+     List<Dev> findAll();
+     Dev save(Dev dev);
+     Dev update(Long id);
 }

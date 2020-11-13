@@ -12,8 +12,8 @@ import java.util.Optional;
 @Service
 public class DevServiceImpl implements DevService {
 
-    private DevRepository devRepository;
-    private SQSManager sqsManager;
+    private final DevRepository devRepository;
+    private final SQSManager sqsManager;
 
     public DevServiceImpl(DevRepository devRepository, SQSManager sqsManager) {
         this.devRepository = devRepository;
